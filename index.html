@@ -373,69 +373,6 @@
       align-items: center;
     }
 
-    /* ========== 設定モーダル（ボトムシート） ========== */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 200;
-      display: none;
-      align-items: flex-end;
-      justify-content: center;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .modal-backdrop.show { display: flex; opacity: 1; }
-
-    .modal-sheet {
-      background: var(--surface);
-      border-radius: 16px 16px 0 0;
-      width: 100%;
-      max-width: 560px;
-      padding: 12px 20px 24px;
-      transform: translateY(100%);
-      transition: transform 0.25s ease-out;
-    }
-    .modal-backdrop.show .modal-sheet { transform: translateY(0); }
-
-    .modal-handle {
-      width: 36px;
-      height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      margin: 0 auto 16px;
-    }
-    .modal-title {
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-
-    .setting-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 14px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .setting-info { flex: 1; min-width: 0; }
-    .setting-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-    .setting-desc { font-size: 12px; color: var(--text-sub); line-height: 1.5; }
-
-    .modal-btn {
-      display: block;
-      width: 100%;
-      padding: 12px;
-      background: var(--accent-light);
-      color: var(--accent);
-      border: none;
-      border-radius: 10px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 16px;
-    }
-    .modal-btn:active { opacity: 0.7; }
 
     /* ========== 未定プレースホルダー ========== */
     .undefined-placeholder {
@@ -475,28 +412,10 @@
     <div class="app-date" id="headerDate"></div>
   </div>
   <div class="header-actions">
-    <button class="refresh-btn" onclick="openSettings()" title="設定">⚙</button>
     <button class="refresh-btn" onclick="refreshCurrent()" title="更新">↻</button>
   </div>
 </header>
 
-<!-- 設定モーダル -->
-<div class="modal-backdrop" id="settingsModal" onclick="closeSettings(event)">
-  <div class="modal-sheet" onclick="event.stopPropagation()">
-    <div class="modal-handle"></div>
-    <div class="modal-title">設定</div>
-
-    <div class="setting-item">
-      <div class="setting-info">
-        <div class="setting-name">バックグラウンド更新</div>
-        <div class="setting-desc">アプリを開いていなくても2時間おきに自動でClassroomを取得します。<br>※設定にはGoogleログインが必要なため、外部ブラウザで開きます。</div>
-      </div>
-      <button class="modal-btn" style="width:auto;padding:8px 14px;font-size:13px;" onclick="openBgSyncSetup()">設定する</button>
-    </div>
-
-    <button class="modal-btn" onclick="closeSettings()">閉じる</button>
-  </div>
-</div>
 
 <!-- ナビゲーション -->
 <nav class="nav">
@@ -1080,9 +999,6 @@ function openSettings() {
   document.getElementById('settingsModal').classList.add('show');
 }
 
-// BG sync 設定は GAS A が提供する別画面（外部ブラウザで開く）
-const BG_SYNC_SETUP_URL = 'https://script.google.com/a/macros/gakugei-hs.info/s/AKfycbz3_i67CSZW37J_GNizxk3tFBrkuZ6_YutCRDS1SKCqLVuEvQ5HwPelDST_sNL-jQ_O/exec?p=bg-sync-setup';
-
 // ========== オンボーディング（初回登録） ==========
 
 function showOnboarding() {
@@ -1162,63 +1078,6 @@ function openExternalUrl(url) {
   }
 }
 
-function openBgSyncSetup() {
-  const authorized = localStorage.getItem('gasA_authorized') === 'true';
-
-  if (authorized) {
-    // 認証済み → そのまま外部ブラウザで開く
-    if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
-      liff.openWindow({ url: BG_SYNC_SETUP_URL, external: true });
-    } else {
-      window.open(BG_SYNC_SETUP_URL, '_blank');
-    }
-    return;
-  }
-
-  // 未認証 → 初回はChromeで開くよう案内するモーダル
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;
-    display:flex;align-items:center;justify-content:center;padding:24px;
-  `;
-  modal.innerHTML = `
-    <div style="background:#fff;border-radius:16px;padding:24px;max-width:340px;width:100%;">
-      <div style="font-size:17px;font-weight:700;margin-bottom:10px;">🔑 初回のみ認証が必要</div>
-      <p style="font-size:13px;line-height:1.7;color:#334155;margin-bottom:8px;">
-        バックグラウンド更新の設定には、<strong>初回だけGoogleアカウントへの許可</strong>が必要です。<br><br>
-        LINEのブラウザでは認証できないため、<strong>ChromeやSafariで開いてください。</strong>
-      </p>
-      <div style="background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:11px;word-break:break-all;color:#475569;margin-bottom:16px;" id="bgsync-url-display">${BG_SYNC_SETUP_URL}</div>
-      <div style="display:flex;gap:8px;flex-direction:column;">
-        <button id="bgsync-copy" style="padding:10px;border:none;border-radius:10px;background:#6366f1;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">📋 URLをコピーしてChromeで開く</button>
-        <button id="bgsync-cancel" style="padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;font-size:13px;cursor:pointer;">キャンセル</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-
-  document.getElementById('bgsync-cancel').onclick = () => modal.remove();
-  document.getElementById('bgsync-copy').onclick = () => {
-    navigator.clipboard.writeText(BG_SYNC_SETUP_URL).then(() => {
-      document.getElementById('bgsync-copy').textContent = '✅ コピーしました！ChromeでURLを貼り付けて開いてね';
-    }).catch(() => {
-      // clipboard API が使えない場合はテキストを選択状態にする
-      const el = document.getElementById('bgsync-url-display');
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      window.getSelection().removeAllRanges();
-      window.getSelection().addRange(range);
-      document.getElementById('bgsync-copy').textContent = '↑ URLを長押しでコピーしてね';
-    });
-  };
-}
-
-function closeSettings(e) {
-  if (e && e.target && e.target.id !== 'settingsModal' && e.type === 'click') {
-    if (!e.currentTarget || e.currentTarget !== e.target) return;
-  }
-  document.getElementById('settingsModal').classList.remove('show');
-}
 
 function expandItem(el) {
   if (event.target.classList.contains('item-check')) return;
@@ -1247,7 +1106,7 @@ function getInitialTab() {
         tab = new URLSearchParams(clean).get('tab');
       }
     }
-    if (['home','tasks','ann','settings'].indexOf(tab) >= 0) return tab;
+    if (['home','tasks','ann'].indexOf(tab) >= 0) return tab;
   } catch(e) { console.error('getInitialTab error', e); }
   return 'home';
 }
@@ -1309,9 +1168,7 @@ console.log('INITIAL_TAB:', INITIAL_TAB);
 
   loadedTabs.add('home');
   loadHome();
-  if (INITIAL_TAB === 'settings') {
-    setTimeout(() => openSettings(), 300);
-  } else if (INITIAL_TAB === 'tasks' || INITIAL_TAB === 'ann') {
+  if (INITIAL_TAB === 'tasks' || INITIAL_TAB === 'ann') {
     setTimeout(() => switchTab(INITIAL_TAB), 300);
   }
 })();
