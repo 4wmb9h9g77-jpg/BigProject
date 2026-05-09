@@ -501,6 +501,8 @@
 <!-- ナビゲーション -->
 <nav class="nav">
   <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">ホーム</button>
+  <button class="nav-btn" id="nav-tasks" onclick="switchTab('tasks')">課題</button>
+  <button class="nav-btn" id="nav-ann" onclick="switchTab('ann')">お知らせ</button>
 </nav>
 
 <!-- メインコンテンツ -->
@@ -511,12 +513,14 @@
     <div id="home-content"><div class="loader"><div class="spinner"></div>読み込み中...</div></div>
   </div>
 
-  <!-- 課題・お知らせパネルは非表示（将来復活用に残す） -->
-  <div class="panel" id="panel-tasks" style="display:none!important">
-    <div id="tasks-content"></div>
+  <!-- 課題 -->
+  <div class="panel" id="panel-tasks">
+    <div id="tasks-content"><div class="loader"><div class="spinner"></div>読み込み中...</div></div>
   </div>
-  <div class="panel" id="panel-ann" style="display:none!important">
-    <div id="ann-content"></div>
+
+  <!-- お知らせ -->
+  <div class="panel" id="panel-ann">
+    <div id="ann-content"><div class="loader"><div class="spinner"></div>読み込み中...</div></div>
   </div>
 
 </main>
@@ -571,7 +575,6 @@ async function initLiff() {
     console.log('[LIFF] URL:', window.location.href);
     console.log('[LIFF] isLineUA:', isLineUA, 'hasLiffState:', hasLiffState, 'hasCode:', hasCode);
 
-    await new Promise(r => setTimeout(r, 3000));
     debugStatus('init...');
 
     const timeout = new Promise((_, reject) =>
@@ -1212,12 +1215,16 @@ console.log('INITIAL_TAB:', INITIAL_TAB);
     showLiffError('LINE 内で開いてください。<br>友達追加した bot のリッチメニューから開くか、配布されたリンクをタップしてください。');
     return;
   }
+  // INITIAL_TAB はページ読み込み時（liff.state がまだURLにある段階）に取得済み
+  // liff.init() 後に URL が書き換わっても INITIAL_TAB は正しい値を保持している
+  console.log('[BOOT] INITIAL_TAB:', INITIAL_TAB);
+
   loadedTabs.add('home');
   loadHome();
   if (INITIAL_TAB === 'settings') {
-    setTimeout(() => openSettings(), 200);
+    setTimeout(() => openSettings(), 300);
   } else if (INITIAL_TAB === 'tasks' || INITIAL_TAB === 'ann') {
-    setTimeout(() => switchTab(INITIAL_TAB), 100);
+    setTimeout(() => switchTab(INITIAL_TAB), 300);
   }
 })();
 </script>
