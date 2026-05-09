@@ -1057,7 +1057,7 @@ function buildTimeline(items, opts) {
       }
 
       if (item.link) {
-        html += `<a class="classroom-link" href="${escHtml(item.link)}" target="_blank" onclick="event.stopPropagation()">🔗 Classroomで開く</a>`;
+        html += `<span class="classroom-link" onclick="event.stopPropagation(); openExternalUrl('${escHtml(item.link)}')">🔗 Classroomで開く</span>`;
       }
 
       html += `</div></div></div>`;
@@ -1085,12 +1085,63 @@ function openSettings() {
 // BG sync 設定は GAS A が提供する別画面（外部ブラウザで開く）
 const BG_SYNC_SETUP_URL = 'https://script.google.com/a/macros/gakugei-hs.info/s/AKfycbz3_i67CSZW37J_GNizxk3tFBrkuZ6_YutCRDS1SKCqLVuEvQ5HwPelDST_sNL-jQ_O/exec?p=bg-sync-setup';
 
-function openBgSyncSetup() {
+function openExternalUrl(url) {
   if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
-    liff.openWindow({ url: BG_SYNC_SETUP_URL, external: true });
+    liff.openWindow({ url: url, external: true });
   } else {
-    window.open(BG_SYNC_SETUP_URL, '_blank');
+    window.open(url, '_blank');
   }
+}
+
+function openBgSyncSetup() {
+  const authorized = localStorage.getItem('gasA_authorized') === 'true';
+
+  if (authorized) {
+    // 認証済み → そのまま外部ブラウザで開く
+    if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+      liff.openWindow({ url: BG_SYNC_SETUP_URL, external: true });
+    } else {
+      window.open(BG_SYNC_SETUP_URL, '_blank');
+    }
+    return;
+  }
+
+  // 未認証 → 初回はChromeで開くよう案内するモーダル
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  `;
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:24px;max-width:340px;width:100%;">
+      <div style="font-size:17px;font-weight:700;margin-bottom:10px;">🔑 初回のみ認証が必要</div>
+      <p style="font-size:13px;line-height:1.7;color:#334155;margin-bottom:8px;">
+        バックグラウンド更新の設定には、<strong>初回だけGoogleアカウントへの許可</strong>が必要です。<br><br>
+        LINEのブラウザでは認証できないため、<strong>ChromeやSafariで開いてください。</strong>
+      </p>
+      <div style="background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:11px;word-break:break-all;color:#475569;margin-bottom:16px;" id="bgsync-url-display">${BG_SYNC_SETUP_URL}</div>
+      <div style="display:flex;gap:8px;flex-direction:column;">
+        <button id="bgsync-copy" style="padding:10px;border:none;border-radius:10px;background:#6366f1;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">📋 URLをコピーしてChromeで開く</button>
+        <button id="bgsync-cancel" style="padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;font-size:13px;cursor:pointer;">キャンセル</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('bgsync-cancel').onclick = () => modal.remove();
+  document.getElementById('bgsync-copy').onclick = () => {
+    navigator.clipboard.writeText(BG_SYNC_SETUP_URL).then(() => {
+      document.getElementById('bgsync-copy').textContent = '✅ コピーしました！ChromeでURLを貼り付けて開いてね';
+    }).catch(() => {
+      // clipboard API が使えない場合はテキストを選択状態にする
+      const el = document.getElementById('bgsync-url-display');
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      document.getElementById('bgsync-copy').textContent = '↑ URLを長押しでコピーしてね';
+    });
+  };
 }
 
 function closeSettings(e) {
@@ -1133,6 +1184,19 @@ function getInitialTab() {
 const INITIAL_TAB = getInitialTab();
 console.log('window.location.search:', window.location.search);
 console.log('INITIAL_TAB:', INITIAL_TAB);
+
+// GAS A 認証済みフラグの検知（bg-sync-setup から ?gasAAuthorized=true で戻ってきたとき）
+(function checkGasAAuth() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('gasAAuthorized') === 'true') {
+      localStorage.setItem('gasA_authorized', 'true');
+      // URLからパラメータを消す（履歴を汚さない）
+      const clean = window.location.pathname;
+      window.history.replaceState(null, '', clean);
+    }
+  } catch(_) {}
+})();
 
 (async function bootstrap() {
   // デバッグ用: ?p=bypass でLIFF認証をスキップ
