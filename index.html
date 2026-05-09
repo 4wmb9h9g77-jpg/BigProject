@@ -1109,7 +1109,9 @@ function showOnboarding() {
       <div style="background:#eef2ff;border-radius:12px;padding:14px;margin-bottom:20px;font-size:12px;color:#6366f1;line-height:1.6;text-align:left;">
         💡 <strong>手順：</strong><br>
         ① 下のボタンをタップ<br>
-        ② Chromeが開いたら学校アカウントでログイン<br>
+        ② Chromeで <strong>学校アカウント（@gakugei-hs.info）</strong> でログイン<br>
+        　 ⚠️「Page not found」が出たらアカウントが違います<br>
+        　 　Chrome右上のアイコンから学校アカウントに切り替えてね<br>
         ③「登録完了」画面が出たら「アプリに戻る」をタップ
       </div>
       <button onclick="startGoogleRegistration()" style="
@@ -1261,13 +1263,6 @@ console.log('INITIAL_TAB:', INITIAL_TAB);
     const p = new URLSearchParams(window.location.search);
     if (p.get('gasAAuthorized') === 'true') {
       localStorage.setItem('gasA_authorized', 'true');
-    }
-    if (p.get('registered') === 'true') {
-      localStorage.setItem('onboardingDone', 'true');
-      localStorage.setItem('gasA_authorized', 'true');
-    }
-    if (p.get('gasAAuthorized') === 'true' || p.get('registered') === 'true') {
-      // URLからパラメータを消す（履歴を汚さない）
       window.history.replaceState(null, '', window.location.pathname);
     }
   } catch(_) {}
@@ -1295,8 +1290,15 @@ console.log('INITIAL_TAB:', INITIAL_TAB);
     return;
   }
 
-  // 初回のみオンボーディング画面を表示（Googleアカウント登録を促す）
-  if (!localStorage.getItem('onboardingDone')) {
+  // 登録チェック：GAS B に lineUserId が登録済みか確認
+  // localStorageはブラウザをまたぐと信用できないので毎回サーバーに問い合わせる
+  try {
+    const res = await callGasB('getMainPageData', { lineUserId, forceRefresh: false });
+    if (!res || !res.success) {
+      showOnboarding();
+      return;
+    }
+  } catch(e) {
     showOnboarding();
     return;
   }
