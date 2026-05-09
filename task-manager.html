@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>72期E組 タスク管理</title>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-sub: #64748b;
+      --accent: #6366f1;
+      --accent-light: #eef2ff;
+
+      /* 教科カラー */
+      --c-math:  #3b82f6; --c-math-bg:  #eff6ff;
+      --c-sci:   #10b981; --c-sci-bg:   #ecfdf5;
+      --c-eng:   #f59e0b; --c-eng-bg:   #fffbeb;
+      --c-jp:    #ec4899; --c-jp-bg:    #fdf2f8;
+      --c-soc:   #f97316; --c-soc-bg:   #fff7ed;
+      --c-pe:    #22c55e; --c-pe-bg:    #f0fdf4;
+      --c-art:   #e879f9; --c-art-bg:   #fdf4ff;
+      --c-home:  #14b8a6; --c-home-bg:  #f0fdfa;
+      --c-ssh:   #8b5cf6; --c-ssh-bg:   #f5f3ff;
+      --c-lhr:   #6366f1; --c-lhr-bg:   #eef2ff;
+      --c-other: #94a3b8; --c-other-bg: #f8fafc;
+
+      /* 緊急度カラー */
+      --urgent: #ef4444;
+      --soon:   #f59e0b;
+      --later:  #6366f1;
+    }
+
+    body {
+      font-family: 'Hiragino Sans', 'Meiryo', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ========== ヘッダー ========== */
+    .app-header {
+      background: var(--accent);
+      color: #fff;
+      padding: 0 16px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+    }
+    .app-title { font-size: 16px; font-weight: 700; }
+    .app-date  { font-size: 12px; opacity: 0.85; }
+    .refresh-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+    .refresh-btn:hover { background: rgba(255,255,255,0.3); }
+
+    /* ========== ナビゲーション ========== */
+    .nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .nav-btn {
+      flex: 1;
+      min-width: 72px;
+      padding: 12px 6px 10px;
+      border: none;
+      background: none;
+      color: var(--text-sub);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .nav-btn .nav-icon { font-size: 18px; }
+    .nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ========== メインコンテンツ ========== */
+    .main { flex: 1; overflow-y: auto; }
+    .panel { display: none; padding: 16px; }
+    .panel.active { display: block; }
+
+    /* ========== 時間割 ========== */
+    .timetable-wrap {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 16px;
+      color: #fff;
+    }
+    .timetable-label {
+      font-size: 12px;
+      font-weight: 700;
+      opacity: 0.85;
+      margin-bottom: 10px;
+    }
+    .timetable-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+    }
+    .tt-cell {
+      min-width: 72px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 10px;
+      padding: 8px 6px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.2);
+      flex-shrink: 0;
+    }
+    .tt-cell.changed { background: rgba(255,220,100,0.25); border-color: rgba(255,220,100,0.5); }
+    .tt-cell.empty   { opacity: 0.4; }
+    .tt-hour    { font-size: 10px; opacity: 0.8; margin-bottom: 3px; }
+    .tt-subject { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
+    .tt-teacher { font-size: 10px; opacity: 0.7; }
+    .tt-changed { font-size: 9px; color: #fde68a; margin-top: 2px; }
+
+    /* ========== タイムライン ========== */
+    .timeline { position: relative; padding-left: 28px; }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 9px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .tl-group { margin-bottom: 20px; }
+
+    .tl-date-label {
+      position: relative;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-sub);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tl-date-label::before {
+      content: '';
+      position: absolute;
+      left: -22px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2.5px solid var(--border);
+      background: var(--bg);
+    }
+    .tl-date-label.urgent { color: var(--urgent); }
+    .tl-date-label.urgent::before { border-color: var(--urgent); background: #fef2f2; }
+    .tl-date-label.soon   { color: var(--soon); }
+    .tl-date-label.soon::before   { border-color: var(--soon); background: #fffbeb; }
+    .tl-date-label.later  { color: var(--later); }
+    .tl-date-label.later::before  { border-color: var(--later); background: var(--accent-light); }
+
+    .tl-item {
+      background: var(--surface);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      margin-bottom: 6px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      transition: box-shadow 0.15s, transform 0.15s;
+      cursor: default;
+    }
+    .tl-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+    .tl-item.task-item { border-left: 3px solid var(--accent); }
+    .tl-item.ann-item  { border-left: 3px solid #0ea5e9; }
+    .tl-item.completed { opacity: 0.5; }
+    .tl-item.completed .item-title { text-decoration: line-through; color: var(--text-sub); }
+    .tl-item.expandable { cursor: pointer; }
+
+    .item-desc-short { display: block; }
+    .item-desc-full  { display: none; white-space: pre-wrap; }
+    .tl-item.expanded .item-desc-short { display: none; }
+    .tl-item.expanded .item-desc-full  { display: block; }
+
+    .expand-hint {
+      font-size: 10px;
+      color: var(--accent);
+      margin-top: 3px;
+    }
+    .tl-item.expanded .expand-hint { display: none; }
+
+    .classroom-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-light);
+      border: 1px solid #c7d2fe;
+      border-radius: 6px;
+      padding: 3px 8px;
+      margin-top: 6px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .classroom-link:active { opacity: 0.7; }
+
+    /* トースト通知 */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1e293b;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 20px;
+      z-index: 999;
+      opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+      white-space: nowrap;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .item-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 2px solid var(--border);
+      flex-shrink: 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      margin-top: 1px;
+    }
+    .item-check.checked { background: var(--accent); border-color: var(--accent); }
+    .item-check.checked::after { content: '✓'; color: #fff; font-size: 11px; font-weight: 700; }
+    .item-check.loading { opacity: 0.5; pointer-events: none; }
+
+    .item-body { flex: 1; min-width: 0; }
+    .item-title { font-size: 14px; font-weight: 600; margin-bottom: 3px; line-height: 1.3; word-break: break-all; }
+    .item-desc  { font-size: 12px; color: var(--text-sub); line-height: 1.4; margin-bottom: 4px; }
+    .item-meta  { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+    .subject-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+
+    .deadline-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      background: #fef2f2;
+      color: var(--urgent);
+    }
+    .deadline-tag.soon   { background: #fffbeb; color: var(--soon); }
+    .deadline-tag.normal { background: var(--accent-light); color: var(--accent); }
+    .deadline-tag.none   { background: var(--bg); color: var(--text-sub); }
+
+    .ann-icon { color: #0ea5e9; font-size: 12px; }
+
+    /* ========== ローディング / 空 ========== */
+    .loader {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--text-sub);
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--text-sub);
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 8px; }
+    .empty-text { font-size: 14px; }
+
+    /* ========== 解析中バッジ ========== */
+    .pending-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #c2410c;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+    }
+    .pending-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #f97316;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+    /* ========== セクションヘッダ ========== */
+    .section-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    /* ========== エラー ========== */
+    .error-box {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: #dc2626;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    /* ========== ヘッダー操作ボタン群 ========== */
+    .header-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    /* ========== 設定モーダル（ボトムシート） ========== */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .modal-backdrop.show { display: flex; opacity: 1; }
+
+    .modal-sheet {
+      background: var(--surface);
+      border-radius: 16px 16px 0 0;
+      width: 100%;
+      max-width: 560px;
+      padding: 12px 20px 24px;
+      transform: translateY(100%);
+      transition: transform 0.25s ease-out;
+    }
+    .modal-backdrop.show .modal-sheet { transform: translateY(0); }
+
+    .modal-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .setting-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .setting-info { flex: 1; min-width: 0; }
+    .setting-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .setting-desc { font-size: 12px; color: var(--text-sub); line-height: 1.5; }
+
+    .modal-btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: var(--accent-light);
+      color: var(--accent);
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    .modal-btn:active { opacity: 0.7; }
+
+    /* ========== 未定プレースホルダー ========== */
+    .undefined-placeholder {
+      background: var(--surface);
+      border: 1.5px dashed var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .undefined-placeholder:hover {
+      background: var(--accent-light);
+      border-color: var(--accent);
+    }
+    .undefined-placeholder:active { transform: scale(0.98); }
+    .undefined-placeholder.loading { cursor: default; pointer-events: none; opacity: 0.7; }
+    .undefined-icon { font-size: 24px; }
+    .undefined-info { flex: 1; min-width: 0; }
+    .undefined-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .undefined-hint { font-size: 11px; color: var(--accent); margin-top: 2px; }
+    .undefined-arrow { font-size: 18px; color: var(--text-sub); }
+  </style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- ヘッダー -->
+<header class="app-header">
+  <div>
+    <div class="app-title">72期E組</div>
+    <div class="app-date" id="headerDate"></div>
+  </div>
+  <div class="header-actions">
+    <button class="refresh-btn" onclick="openSettings()" title="設定">⚙</button>
+    <button class="refresh-btn" onclick="refreshCurrent()" title="更新">↻</button>
+  </div>
+</header>
+
+<!-- 設定モーダル -->
+<div class="modal-backdrop" id="settingsModal" onclick="closeSettings(event)">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title">設定</div>
+
+    <div class="setting-item">
+      <div class="setting-info">
+        <div class="setting-name">バックグラウンド更新</div>
+        <div class="setting-desc">アプリを開いていなくても2時間おきに自動でClassroomを取得します。<br>※設定にはGoogleログインが必要なため、外部ブラウザで開きます。</div>
+      </div>
+      <button class="modal-btn" style="width:auto;padding:8px 14px;font-size:13px;" onclick="openBgSyncSetup()">設定する</button>
+    </div>
+
+    <button class="modal-btn" onclick="closeSettings()">閉じる</button>
+  </div>
+</div>
+
+<!-- ナビゲーション -->
+<nav class="nav">
+  <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">ホーム</button>
+  <button class="nav-btn" id="nav-tasks" onclick="switchTab('tasks')">課題</button>
+  <button class="nav-btn" id="nav-ann" onclick="switchTab('ann')">お知らせ</button>
+</nav>
+
+<!-- メインコンテンツ -->
+<main class="main">
+
+  <!-- ホーム -->
+  <div class="panel active" id="panel-home">
+    <div id="home-content"><div class="loader"><div class="spinner"></div>読み込み中...</div></div>
+  </div>
+
+  <!-- 課題 -->
+  <div class="panel" id="panel-tasks">
+    <div id="tasks-content"><div class="loader"><div class="spinner"></div>読み込み中...</div></div>
+  </div>
+
+  <!-- お知らせ -->
+  <div class="panel" id="panel-ann">
+    <div id="ann-content"><div class="loader"><div class="spinner"></div>読み込み中...</div></div>
+  </div>
+
+</main>
+
+<script>
+// ========== GAS B API 呼び出し ==========
+// GAS BのデプロイURLをここに設定（exec URLを使う）
+const GAS_B_EXEC_URL = 'https://script.google.com/macros/s/AKfycbybd3yazbe3vH3hOSWKiSyn18jmqMgVGWeOK3hsswkhUcKu-7x1cuYe9TVDQGbLuZ4l4w/exec';
+
+// Content-Type: text/plain でPOST → プリフライトなし → GASのCORSが通る
+async function callGasB(action, params) {
+  const payload = Object.assign({ action }, params || {});
+  try {
+    const res = await fetch(GAS_B_EXEC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      redirect: 'follow'
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch(e) {
+    // POSTがGETにリダイレクトされた場合のフォールバック（GETで再試行）
+    const qs = Object.entries(payload)
+      .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(String(v)))
+      .join('&');
+    const res2 = await fetch(GAS_B_EXEC_URL + '?' + qs);
+    if (!res2.ok) throw new Error('HTTP ' + res2.status);
+    return await res2.json();
+  }
+}
+
+// ========== LIFF 初期化 ==========
+
+const LIFF_ID = '2009989056-nGhNsPwL';
+let lineUserId = null;
+let liffReady = false;
+
+async function initLiff() {
+  if (typeof liff === 'undefined') {
+    debugStatus('SDK not loaded');
+    return false;
+  }
+  try {
+    const ua = navigator.userAgent;
+    const isLineUA = /Line\//i.test(ua);
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasLiffState = urlParams.has('liff.state');
+    const hasCode = urlParams.has('code');
+    debugStatus('UA:' + (isLineUA ? 'LINE✓' : 'notLINE') + ' liff.state:' + hasLiffState);
+    console.log('[LIFF] UA:', ua);
+    console.log('[LIFF] URL:', window.location.href);
+    console.log('[LIFF] isLineUA:', isLineUA, 'hasLiffState:', hasLiffState, 'hasCode:', hasCode);
+
+    await new Promise(r => setTimeout(r, 3000));
+    debugStatus('init...');
+
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('init timeout 30s')), 30000)
+    );
+    await Promise.race([liff.init({ liffId: LIFF_ID }), timeout]);
+    debugStatus('init OK');
+    console.log('[LIFF] init OK. isInClient:', liff.isInClient(), 'isLoggedIn:', liff.isLoggedIn());
+
+    if (!liff.isLoggedIn()) {
+      debugStatus('not logged in, redirecting...');
+      liff.login();
+      return false;
+    }
+    debugStatus('get profile');
+    const profile = await Promise.race([
+      liff.getProfile(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('profile timeout')), 10000))
+    ]);
+    lineUserId = profile.userId;
+    liffReady = true;
+    debugStatus('OK ' + (lineUserId ? lineUserId.substring(0, 8) + '..' : '???'));
+    return true;
+  } catch(e) {
+    console.error('[LIFF] init failed:', e);
+    console.error('[LIFF] error name:', e.code || e.name, 'message:', e.message);
+    debugStatus('ERR: ' + (e.message || e).substring(0, 60));
+    return false;
+  }
+}
+
+function debugStatus(msg) {
+  try {
+    const el = document.getElementById('headerDate');
+    if (el) el.textContent = el.dataset.orig
+      ? (el.dataset.orig + ' / ' + msg)
+      : msg;
+  } catch(_) {}
+}
+
+function showLiffError(msg) {
+  document.body.innerHTML =
+    `<div style="padding:24px;font-family:'Hiragino Sans',sans-serif;color:#dc2626;">
+       <h2 style="font-size:18px;margin-bottom:12px;">⚠️ アプリを開けません</h2>
+       <p style="font-size:14px;line-height:1.6;">${msg}</p>
+     </div>`;
+}
+
+// ========== 定数 ==========
+
+const SUBJECT_MASTER = {
+  1:  { name: '体育',                  color: '#22c55e', bg: '#f0fdf4' },
+  2:  { name: '音/美/工/書',           color: '#e879f9', bg: '#fdf4ff' },
+  3:  { name: '古典探究',              color: '#ec4899', bg: '#fdf2f8' },
+  4:  { name: '歴史探究',              color: '#f97316', bg: '#fff7ed' },
+  5:  { name: '数学B',                 color: '#3b82f6', bg: '#eff6ff' },
+  6:  { name: '化学基礎',              color: '#10b981', bg: '#ecfdf5' },
+  7:  { name: '論理・表現Ⅱ',          color: '#f59e0b', bg: '#fffbeb' },
+  8:  { name: '公共',                  color: '#f97316', bg: '#fff7ed' },
+  9:  { name: '英語コミュニケーションⅡ', color: '#f59e0b', bg: '#fffbeb' },
+  10: { name: '数学C',                 color: '#3b82f6', bg: '#eff6ff' },
+  11: { name: '保健',                  color: '#22c55e', bg: '#f0fdf4' },
+  12: { name: '数学II',                color: '#3b82f6', bg: '#eff6ff' },
+  13: { name: '文学国語',              color: '#ec4899', bg: '#fdf2f8' },
+  14: { name: '物理基礎',              color: '#10b981', bg: '#ecfdf5' },
+  15: { name: '家庭基礎',              color: '#14b8a6', bg: '#f0fdfa' },
+  16: { name: 'SSH探究',               color: '#8b5cf6', bg: '#f5f3ff' },
+  17: { name: 'LHR',                   color: '#6366f1', bg: '#eef2ff' },
+  99: { name: '自習',                  color: '#94a3b8', bg: '#f8fafc' },
+  0:  { name: 'その他',                color: '#94a3b8', bg: '#f8fafc' }
+};
+
+function subjectInfo(id) {
+  return SUBJECT_MASTER[Number(id)] || SUBJECT_MASTER[0];
+}
+
+// ========== 日付ユーティリティ ==========
+
+const TODAY_STR = (() => {
+  const d = new Date();
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+})();
+
+const DOW_JP = ['日','月','火','水','木','金','土'];
+
+function parseDateStr(s) {
+  return new Date(String(s).split('/').join('-'));
+}
+
+function formatDisplayDate(dateStr) {
+  if (!dateStr || dateStr === '未定') return '未定';
+  const d = parseDateStr(dateStr);
+  if (isNaN(d)) return dateStr;
+  const today = parseDateStr(TODAY_STR);
+  const diff = Math.round((d - today) / 86400000);
+  if (diff === 0) return '今日';
+  if (diff === 1) return '明日';
+  if (diff === -1) return '昨日';
+  return `${d.getMonth()+1}/${d.getDate()}(${DOW_JP[d.getDay()]})`;
+}
+
+function dateUrgency(dateStr) {
+  if (!dateStr || dateStr === '未定') return 'none';
+  const d = parseDateStr(dateStr);
+  if (isNaN(d)) return 'none';
+  const today = parseDateStr(TODAY_STR);
+  const diff = Math.round((d - today) / 86400000);
+  if (diff <= 1) return 'urgent';
+  if (diff <= 3) return 'soon';
+  return 'later';
+}
+
+// ヘッダー日付
+(function setHeaderDate() {
+  const el = document.getElementById('headerDate');
+  const d = new Date();
+  const dateStr = `${d.getMonth()+1}月${d.getDate()}日(${DOW_JP[d.getDay()]})`;
+  el.dataset.orig = dateStr;
+  el.textContent = dateStr;
+})();
+
+// ========== タブ切り替え ==========
+
+let currentTab = 'home';
+const loadedTabs = new Set();
+
+function switchTab(tab) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  currentTab = tab;
+  if (!loadedTabs.has(tab)) {
+    loadedTabs.add(tab);
+    loadTab(tab);
+  }
+}
+
+function refreshCurrent() {
+  loadedTabs.delete(currentTab);
+  if (currentTab === 'tasks') undefinedTasks = null;
+  const content = document.getElementById(
+    currentTab === 'home'  ? 'home-content'  :
+    currentTab === 'tasks' ? 'tasks-content' : 'ann-content'
+  );
+  content.innerHTML = '<div class="loader"><div class="spinner"></div>更新中...</div>';
+  loadedTabs.add(currentTab);
+  loadTab(currentTab, true);
+}
+
+function loadTab(tab, forceRefresh) {
+  if (tab === 'home')  loadHome(forceRefresh);
+  if (tab === 'tasks') loadTasks(forceRefresh);
+  if (tab === 'ann')   loadAnn(forceRefresh);
+}
+
+// ========== ホーム ==========
+
+function loadHome(forceRefresh) {
+  callGasB('getMainPageData', { forceRefresh: !!forceRefresh, lineUserId })
+    .then(renderHome)
+    .catch(err => {
+      document.getElementById('home-content').innerHTML =
+        `<div class="error-box">読み込みエラー: ${err.message}</div>`;
+    });
+}
+
+function renderHome(data) {
+  if (!data || !data.success) {
+    document.getElementById('home-content').innerHTML =
+      `<div class="error-box">${data && data.error ? data.error : '読み込みに失敗しました'}</div>`;
+    return;
+  }
+
+  if (data.coursesUpdated) showToast('📚 表示クラスを更新しました');
+
+  let html = '';
+
+  // 時間割
+  if (data.timetable && data.timetable.length) {
+    html += `<div class="timetable-wrap">
+      <div class="timetable-label">${data.date}(${data.dayOfWeek}) の時間割</div>
+      <div class="timetable-scroll">`;
+    data.timetable.forEach(t => {
+      if (!t.subject || t.subject === '空き') {
+        html += `<div class="tt-cell empty">
+          <div class="tt-hour">${t.hour}</div>
+          <div class="tt-subject">—</div>
+        </div>`;
+      } else {
+        html += `<div class="tt-cell${t.changed ? ' changed' : ''}">
+          <div class="tt-hour">${t.hour}</div>
+          <div class="tt-subject">${t.subject}</div>
+          <div class="tt-teacher">${t.teacher}</div>
+          ${t.changed ? '<div class="tt-changed">変更</div>' : ''}
+        </div>`;
+      }
+    });
+    html += `</div></div>`;
+  }
+
+  // 3日以内のタスク＋お知らせをまとめて期限順に並べる
+  const tasks = (data.tasks || []).map(t => ({ ...t, _type: 'task' }));
+  const anns  = (data.announcements || []).map(a => ({ ...a, _type: 'ann' }));
+  const items = [...tasks, ...anns].sort((a, b) => {
+    const da = a.deadline || a.display_until || '9999/99/99';
+    const db = b.deadline || b.display_until || '9999/99/99';
+    return da.localeCompare(db);
+  });
+
+  if (items.length === 0) {
+    html += `<div class="empty-state"><div class="empty-text">3日以内の課題・お知らせはありません</div></div>`;
+  } else {
+    html += `<div class="section-header">直近の課題・お知らせ</div>`;
+    html += buildTimeline(items, { showCheck: false });
+  }
+
+  document.getElementById('home-content').innerHTML = html;
+}
+
+// ========== 課題タブ ==========
+
+let taskStatuses = {};
+let undefinedTasks = null;
+
+function loadTasks(forceRefresh) {
+  document.getElementById('tasks-content').innerHTML =
+    '<div class="loader"><div class="spinner"></div>読み込み中...</div>';
+
+  // ① スプレッドシートから即表示
+  callGasB('getAllTasksFast', { forceRefresh: !!forceRefresh, lineUserId })
+    .then(data => {
+      taskStatuses = {};
+      (data.tasks || []).forEach(t => { taskStatuses[t.announcement_id] = t.completed; });
+      renderTasks(data);
+
+      // ② バックグラウンドでClassroom同期
+      callGasB('syncClassroomData', { forceRefresh: !!forceRefresh, lineUserId })
+        .then(syncRes => {
+          if (syncRes && syncRes.skipped) return;
+          // ③ 同期完了後に再読み込み
+          callGasB('getAllTasksFast', { forceRefresh: false, lineUserId })
+            .then(d => {
+              taskStatuses = {};
+              (d.tasks || []).forEach(t => { taskStatuses[t.announcement_id] = t.completed; });
+              renderTasks(d);
+            })
+            .catch(() => {});
+        })
+        .catch(() => {});
+    })
+    .catch(err => {
+      document.getElementById('tasks-content').innerHTML =
+        `<div class="error-box">${err.message}</div>`;
+    });
+}
+
+function renderTasks(data) {
+  if (!data || !data.success) {
+    document.getElementById('tasks-content').innerHTML =
+      `<div class="error-box">${data && data.error ? data.error : '取得失敗'}</div>`;
+    return;
+  }
+
+  const tasks = (data.tasks || []).sort((a, b) => {
+    const da = a.deadline && a.deadline !== '未定' ? a.deadline : '9999/99/99';
+    const db = b.deadline && b.deadline !== '未定' ? b.deadline : '9999/99/99';
+    return da.localeCompare(db);
+  });
+
+  const undefinedCount = data.undefinedCount || 0;
+
+  let html = '';
+  if (data.pendingCount > 0) {
+    html += `<div class="pending-badge"><span class="pending-dot"></span>解析中 ${data.pendingCount}件（1〜2時間後に反映）</div>`;
+  }
+
+  if (!tasks.length && !data.pendingCount && !undefinedCount && undefinedTasks === null) {
+    html += '<div class="empty-state"><div class="empty-text">課題はありません</div></div>';
+  } else if (tasks.length) {
+    html += buildTimeline(tasks, { showCheck: true });
+  }
+
+  // 期限未定タスク
+  if (undefinedTasks !== null) {
+    if (undefinedTasks.length) {
+      html += `<div class="section-header" style="margin-top:24px">期限未定の課題</div>`;
+      html += buildTimeline(undefinedTasks, { showCheck: true });
+    }
+  } else if (undefinedCount > 0) {
+    html += `<div class="undefined-placeholder" id="undefined-placeholder" onclick="loadUndefinedTasks()">
+      <div class="undefined-icon">📅</div>
+      <div class="undefined-info">
+        <div class="undefined-title">期限未定の課題 ${undefinedCount}件</div>
+        <div class="undefined-hint">タップして表示</div>
+      </div>
+      <div class="undefined-arrow">▼</div>
+    </div>`;
+  }
+
+  document.getElementById('tasks-content').innerHTML = html;
+}
+
+function loadUndefinedTasks() {
+  const ph = document.getElementById('undefined-placeholder');
+  if (!ph) return;
+  ph.classList.add('loading');
+  const info = ph.querySelector('.undefined-info');
+  if (info) info.innerHTML = '<div class="undefined-title">読み込み中...</div>';
+
+  callGasB('getUndefinedTasksFast', { forceRefresh: false, lineUserId })
+    .then(d => {
+      if (!d || !d.success) {
+        if (info) info.innerHTML =
+          `<div class="undefined-title" style="color:#dc2626">読み込み失敗: ${(d && d.error) || ''}</div>`;
+        return;
+      }
+      undefinedTasks = d.tasks || [];
+      undefinedTasks.forEach(t => { taskStatuses[t.announcement_id] = t.completed; });
+
+      const wrapper = document.createElement('div');
+      if (undefinedTasks.length) {
+        wrapper.innerHTML = `<div class="section-header" style="margin-top:24px">期限未定の課題</div>`
+          + buildTimeline(undefinedTasks, { showCheck: true });
+        ph.replaceWith(...Array.from(wrapper.children));
+      } else {
+        ph.remove();
+      }
+    })
+    .catch(err => {
+      if (info) info.innerHTML =
+        `<div class="undefined-title" style="color:#dc2626">読み込み失敗: ${err.message}</div>`;
+    });
+}
+
+function toggleTask(taskId, checkbox) {
+  const newVal = !taskStatuses[taskId];
+  taskStatuses[taskId] = newVal;
+  checkbox.classList.add('loading');
+
+  const item = checkbox.closest('.tl-item');
+  if (newVal) item.classList.add('completed');
+  else item.classList.remove('completed');
+
+  callGasB('setTaskComplete', { taskId, completed: newVal, lineUserId })
+    .then(() => {
+      checkbox.classList.remove('loading');
+      if (newVal) checkbox.classList.add('checked');
+      else checkbox.classList.remove('checked');
+    })
+    .catch(() => {
+      // ロールバック
+      taskStatuses[taskId] = !newVal;
+      if (!newVal) item.classList.add('completed');
+      else item.classList.remove('completed');
+      checkbox.classList.remove('loading');
+    });
+}
+
+// ========== お知らせタブ ==========
+
+function loadAnn(forceRefresh) {
+  document.getElementById('ann-content').innerHTML =
+    '<div class="loader"><div class="spinner"></div>読み込み中...</div>';
+
+  // ① スプレッドシートから即表示
+  callGasB('getAnnFast', { forceRefresh: !!forceRefresh, lineUserId })
+    .then(data => {
+      renderAnn(data);
+      // ② バックグラウンドでClassroom同期
+      callGasB('syncClassroomData', { forceRefresh: !!forceRefresh, lineUserId })
+        .then(syncRes => {
+          if (syncRes && syncRes.skipped) return;
+          // ③ 同期完了後に再読み込み
+          callGasB('getAnnFast', { forceRefresh: false, lineUserId })
+            .then(renderAnn)
+            .catch(() => {});
+        })
+        .catch(() => {});
+    })
+    .catch(err => {
+      document.getElementById('ann-content').innerHTML =
+        `<div class="error-box">${err.message}</div>`;
+    });
+}
+
+function renderAnn(data) {
+  if (!data || !data.success) {
+    document.getElementById('ann-content').innerHTML =
+      `<div class="error-box">${data && data.error ? data.error : '取得失敗'}</div>`;
+    return;
+  }
+
+  let html = '';
+
+  if (data.pendingCount > 0) {
+    html += `<div class="pending-badge"><span class="pending-dot"></span>解析中 ${data.pendingCount}件（1〜2時間後に反映）</div>`;
+  }
+
+  const anns = (data.announcements || []).sort((a, b) => {
+    const da = a.display_until || '9999/99/99';
+    const db = b.display_until || '9999/99/99';
+    return da.localeCompare(db);
+  });
+
+  if (!anns.length && !data.pendingCount) {
+    html += '<div class="empty-state"><div class="empty-text">お知らせはありません</div></div>';
+  } else if (anns.length) {
+    html += buildTimeline(anns, { showCheck: false, isAnn: true });
+  }
+
+  document.getElementById('ann-content').innerHTML = html;
+}
+
+// ========== タイムライン描画 ==========
+
+function buildTimeline(items, opts) {
+  const { showCheck = false, isAnn = false } = opts || {};
+
+  const groups = {};
+  const groupOrder = [];
+  items.forEach(item => {
+    const key = isAnn
+      ? (item.display_until || '未定')
+      : (item.deadline && item.deadline !== '未定' ? item.deadline : '未定');
+    if (!groups[key]) { groups[key] = []; groupOrder.push(key); }
+    groups[key].push(item);
+  });
+  groupOrder.sort((a, b) => a.localeCompare(b));
+
+  let html = '<div class="timeline">';
+  groupOrder.forEach(dateKey => {
+    const urgency = dateKey === '未定' ? 'none' : dateUrgency(dateKey);
+    const label = formatDisplayDate(dateKey);
+
+    html += `<div class="tl-group">
+      <div class="tl-date-label ${urgency}">${label}</div>`;
+
+    groups[dateKey].forEach(item => {
+      const isTask = item._type === 'task' || (!isAnn && item.announcement_id && !item._type);
+      const isCompleted = item.completed;
+      const sid = item.subject_id;
+      const sInfo = subjectInfo(sid);
+      const deadline = item.deadline || '';
+      const deadlineLabel = deadline && deadline !== '未定' ? formatDisplayDate(deadline) : '';
+      const deadlineUrgency = deadline && deadline !== '未定' ? dateUrgency(deadline) : 'none';
+      const isLong = item.description && item.description.length > 80;
+
+      html += `<div class="tl-item ${isTask ? 'task-item' : 'ann-item'}${isCompleted ? ' completed' : ''}${isLong ? ' expandable' : ''}" id="item-${item.announcement_id}"${isLong ? ` onclick="expandItem(this)"` : ''}>`;
+
+      if (showCheck) {
+        html += `<div class="item-check${isCompleted ? ' checked' : ''}"
+          onclick="event.stopPropagation(); toggleTask('${item.announcement_id}', this)"
+          title="${isCompleted ? '完了済み（クリックで戻す）' : '完了にする'}"></div>`;
+      }
+
+      html += `<div class="item-body">
+        <div class="item-title">${escHtml(item.title || '（タイトルなし）')}</div>`;
+
+      if (item.description) {
+        if (isLong) {
+          const short = escHtml(item.description.substring(0, 80)) + '…';
+          const full  = escHtml(item.description);
+          html += `<div class="item-desc item-desc-short">${short}</div>
+                   <div class="item-desc item-desc-full">${full}</div>
+                   <div class="expand-hint">▼ タップして全文表示</div>`;
+        } else {
+          html += `<div class="item-desc">${escHtml(item.description)}</div>`;
+        }
+      }
+
+      html += `<div class="item-meta">
+        <span class="subject-tag" style="background:${sInfo.bg};color:${sInfo.color}">${sInfo.name}</span>`;
+
+      if (!isTask) {
+        html += `<span class="ann-icon">お知らせ</span>`;
+      } else if (deadlineLabel) {
+        html += `<span class="deadline-tag ${deadlineUrgency === 'urgent' ? '' : deadlineUrgency}">${deadlineLabel}まで</span>`;
+      }
+
+      if (item.link) {
+        html += `<a class="classroom-link" href="${escHtml(item.link)}" target="_blank" onclick="event.stopPropagation()">🔗 Classroomで開く</a>`;
+      }
+
+      html += `</div></div></div>`;
+    });
+
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ========== 設定モーダル ==========
+
+function openSettings() {
+  document.getElementById('settingsModal').classList.add('show');
+}
+
+// BG sync 設定は GAS A が提供する別画面（外部ブラウザで開く）
+const BG_SYNC_SETUP_URL = 'https://script.google.com/a/macros/gakugei-hs.info/s/AKfycbz3_i67CSZW37J_GNizxk3tFBrkuZ6_YutCRDS1SKCqLVuEvQ5HwPelDST_sNL-jQ_O/exec?p=bg-sync-setup';
+
+function openBgSyncSetup() {
+  if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+    liff.openWindow({ url: BG_SYNC_SETUP_URL, external: true });
+  } else {
+    window.open(BG_SYNC_SETUP_URL, '_blank');
+  }
+}
+
+function closeSettings(e) {
+  if (e && e.target && e.target.id !== 'settingsModal' && e.type === 'click') {
+    if (!e.currentTarget || e.currentTarget !== e.target) return;
+  }
+  document.getElementById('settingsModal').classList.remove('show');
+}
+
+function expandItem(el) {
+  if (event.target.classList.contains('item-check')) return;
+  el.classList.toggle('expanded');
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ========== 初期ロード ==========
+
+function getInitialTab() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    let tab = params.get('tab');
+    if (!tab) {
+      const state = params.get('liff.state');
+      if (state) {
+        const clean = state.charAt(0) === '?' ? state.slice(1) : state;
+        tab = new URLSearchParams(clean).get('tab');
+      }
+    }
+    if (['home','tasks','ann','settings'].indexOf(tab) >= 0) return tab;
+  } catch(e) { console.error('getInitialTab error', e); }
+  return 'home';
+}
+const INITIAL_TAB = getInitialTab();
+console.log('window.location.search:', window.location.search);
+console.log('INITIAL_TAB:', INITIAL_TAB);
+
+(async function bootstrap() {
+  // デバッグ用: ?p=bypass でLIFF認証をスキップ
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('p') === 'bypass') {
+    console.warn('[DEBUG] LIFF bypass mode - no auth');
+    lineUserId = 'debug-user';
+    liffReady = true;
+    debugStatus('BYPASS MODE');
+    loadedTabs.add('home');
+    loadHome();
+    return;
+  }
+
+  const ok = await initLiff();
+  if (!ok) {
+    if (typeof liff !== 'undefined' && !liff.isLoggedIn()) {
+      return; // liff.login() がリダイレクト中
+    }
+    showLiffError('LINE 内で開いてください。<br>友達追加した bot のリッチメニューから開くか、配布されたリンクをタップしてください。');
+    return;
+  }
+  loadedTabs.add('home');
+  loadHome();
+  if (INITIAL_TAB === 'settings') {
+    setTimeout(() => openSettings(), 200);
+  } else if (INITIAL_TAB === 'tasks' || INITIAL_TAB === 'ann') {
+    setTimeout(() => switchTab(INITIAL_TAB), 100);
+  }
+})();
+</script>
+</body>
+</html>
