@@ -530,6 +530,9 @@
 // GAS BのデプロイURLをここに設定（exec URLを使う）
 const GAS_B_EXEC_URL = 'https://script.google.com/macros/s/AKfycbybd3yazbe3vH3hOSWKiSyn18jmqMgVGWeOK3hsswkhUcKu-7x1cuYe9TVDQGbLuZ4l4w/exec';
 
+// GAS A のデプロイURL（Googleアカウント認証を使う処理はここ経由）
+const GAS_A_EXEC_URL = 'https://script.google.com/a/macros/gakugei-hs.info/s/AKfycbz3_i67CSZW37J_GNizxk3tFBrkuZ6_YutCRDS1SKCqLVuEvQ5HwPelDST_sNL-jQ_O/exec';
+
 // Content-Type: text/plain でPOST → プリフライトなし → GASのCORSが通る
 async function callGasB(action, params) {
   const payload = Object.assign({ action }, params || {});
@@ -1080,6 +1083,75 @@ function openSettings() {
 // BG sync 設定は GAS A が提供する別画面（外部ブラウザで開く）
 const BG_SYNC_SETUP_URL = 'https://script.google.com/a/macros/gakugei-hs.info/s/AKfycbz3_i67CSZW37J_GNizxk3tFBrkuZ6_YutCRDS1SKCqLVuEvQ5HwPelDST_sNL-jQ_O/exec?p=bg-sync-setup';
 
+// ========== オンボーディング（初回登録） ==========
+
+function showOnboarding() {
+  // 全画面オーバーレイとしてオンボーディング画面を表示
+  const overlay = document.createElement('div');
+  overlay.id = 'onboarding-overlay';
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'background:#f1f5f9',
+    'z-index:9999', 'display:flex', 'flex-direction:column',
+    'align-items:center', 'justify-content:center', 'padding:24px'
+  ].join(';');
+
+  const registerUrl = GAS_A_EXEC_URL + '?p=register&lid=' + encodeURIComponent(lineUserId || '');
+
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:32px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.1);">
+      <div style="font-size:52px;margin-bottom:16px;">🎒</div>
+      <h2 style="font-size:20px;font-weight:800;color:#1e293b;margin-bottom:10px;">はじめに登録しよう</h2>
+      <p style="font-size:13px;color:#64748b;line-height:1.7;margin-bottom:20px;">
+        課題・お知らせを正しく表示するために、<br>
+        <strong style="color:#1e293b;">学校のGoogleアカウント</strong>と<br>
+        LINEアカウントを紐付ける必要があります。
+      </p>
+      <div style="background:#eef2ff;border-radius:12px;padding:14px;margin-bottom:20px;font-size:12px;color:#6366f1;line-height:1.6;text-align:left;">
+        💡 <strong>手順：</strong><br>
+        ① 下のボタンをタップ<br>
+        ② Chromeが開いたら学校アカウントでログイン<br>
+        ③「登録完了」画面が出たら「アプリに戻る」をタップ
+      </div>
+      <button onclick="startGoogleRegistration()" style="
+        width:100%;background:#6366f1;color:#fff;border:none;border-radius:14px;
+        padding:16px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;
+      ">🔗 Googleアカウントで登録する</button>
+      <div id="reg-url-area" style="display:none;margin-top:8px;">
+        <p style="font-size:11px;color:#94a3b8;margin-bottom:8px;">ボタンが開かない場合はURLをコピーしてChromeで開いてください</p>
+        <div style="display:flex;gap:8px;">
+          <input id="reg-url-input" type="text" value="${escHtml(registerUrl)}" readonly
+            style="flex:1;font-size:11px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;color:#64748b;background:#f8fafc;">
+          <button onclick="copyRegisterUrl()" style="
+            background:#e2e8f0;border:none;border-radius:8px;padding:8px 12px;
+            font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
+          ">コピー</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+}
+
+function startGoogleRegistration() {
+  const registerUrl = GAS_A_EXEC_URL + '?p=register&lid=' + encodeURIComponent(lineUserId || '');
+  const urlArea = document.getElementById('reg-url-area');
+  if (urlArea) urlArea.style.display = 'block';
+  openExternalUrl(registerUrl);
+}
+
+function copyRegisterUrl() {
+  const input = document.getElementById('reg-url-input');
+  if (!input) return;
+  try {
+    navigator.clipboard.writeText(input.value).then(() => showToast('URLをコピーしました'));
+  } catch(_) {
+    input.select();
+    document.execCommand('copy');
+    showToast('URLをコピーしました');
+  }
+}
+
 function openExternalUrl(url) {
   if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
     liff.openWindow({ url: url, external: true });
@@ -1181,15 +1253,22 @@ const INITIAL_TAB = getInitialTab();
 console.log('window.location.search:', window.location.search);
 console.log('INITIAL_TAB:', INITIAL_TAB);
 
-// GAS A 認証済みフラグの検知（bg-sync-setup から ?gasAAuthorized=true で戻ってきたとき）
+// GAS A 認証済みフラグの検知
+// ?gasAAuthorized=true → bg-sync-setup または register から戻ってきた
+// ?registered=true → Googleアカウント登録完了（初回オンボーディング）
 (function checkGasAAuth() {
   try {
     const p = new URLSearchParams(window.location.search);
     if (p.get('gasAAuthorized') === 'true') {
       localStorage.setItem('gasA_authorized', 'true');
+    }
+    if (p.get('registered') === 'true') {
+      localStorage.setItem('onboardingDone', 'true');
+      localStorage.setItem('gasA_authorized', 'true');
+    }
+    if (p.get('gasAAuthorized') === 'true' || p.get('registered') === 'true') {
       // URLからパラメータを消す（履歴を汚さない）
-      const clean = window.location.pathname;
-      window.history.replaceState(null, '', clean);
+      window.history.replaceState(null, '', window.location.pathname);
     }
   } catch(_) {}
 })();
@@ -1215,6 +1294,13 @@ console.log('INITIAL_TAB:', INITIAL_TAB);
     showLiffError('LINE 内で開いてください。<br>友達追加した bot のリッチメニューから開くか、配布されたリンクをタップしてください。');
     return;
   }
+
+  // 初回のみオンボーディング画面を表示（Googleアカウント登録を促す）
+  if (!localStorage.getItem('onboardingDone')) {
+    showOnboarding();
+    return;
+  }
+
   // INITIAL_TAB はページ読み込み時（liff.state がまだURLにある段階）に取得済み
   // liff.init() 後に URL が書き換わっても INITIAL_TAB は正しい値を保持している
   console.log('[BOOT] INITIAL_TAB:', INITIAL_TAB);
