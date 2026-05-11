@@ -374,6 +374,129 @@
     }
 
 
+    /* ========== 検索タブ ========== */
+    .search-bar-wrap {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .search-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 10px 14px;
+      outline: none;
+      font-family: inherit;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .search-btn:active { opacity: 0.8; }
+
+    .filter-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .filter-select {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 12px;
+      padding: 6px 10px;
+      outline: none;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .filter-select:focus { border-color: var(--accent); }
+    .filter-date-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .filter-date-label { font-size: 12px; color: var(--text-sub); white-space: nowrap; }
+    .filter-date {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 12px;
+      padding: 6px 10px;
+      outline: none;
+      font-family: inherit;
+    }
+    .filter-date:focus { border-color: var(--accent); }
+
+    .archive-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #cbd5e1;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
+    .archive-label { font-size: 13px; color: var(--text-sub); }
+
+    .search-result-count {
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-bottom: 10px;
+    }
+
+    /* 検索結果カード（アーカイブ含む） */
+    .tl-item.archive-item { border-left: 3px solid #94a3b8; opacity: 0.8; }
+    .archive-badge {
+      font-size: 10px;
+      background: #f1f5f9;
+      color: #94a3b8;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-weight: 600;
+    }
+
     /* ========== 未定プレースホルダー ========== */
     .undefined-placeholder {
       background: var(--surface);
@@ -423,6 +546,7 @@
   <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">ホーム</button>
   <button class="nav-btn" id="nav-tasks" onclick="switchTab('tasks')">課題</button>
   <button class="nav-btn" id="nav-ann" onclick="switchTab('ann')">お知らせ</button>
+  <button class="nav-btn" id="nav-search" onclick="switchTab('search')">🔍</button>
 </nav>
 
 <!-- メインコンテンツ -->
@@ -441,6 +565,49 @@
   <!-- お知らせ -->
   <div class="panel" id="panel-ann">
     <div id="ann-content"><div class="loader"><div class="spinner"></div>読み込み中...</div></div>
+  </div>
+
+  <!-- 検索 -->
+  <div class="panel" id="panel-search">
+    <!-- 検索バー -->
+    <div class="search-bar-wrap">
+      <input type="text" class="search-input" id="search-input" placeholder="キーワードで検索…" onkeydown="if(event.key==='Enter')doSearch()">
+      <button class="search-btn" onclick="doSearch()">検索</button>
+    </div>
+
+    <!-- フィルター：種別・教科 -->
+    <div class="filter-row">
+      <select class="filter-select" id="filter-type">
+        <option value="all">すべての種別</option>
+        <option value="task">課題のみ</option>
+        <option value="announcement">お知らせのみ</option>
+      </select>
+      <select class="filter-select" id="filter-subject">
+        <option value="">すべての教科</option>
+      </select>
+    </div>
+
+    <!-- フィルター：締切範囲 -->
+    <div class="filter-date-row">
+      <span class="filter-date-label">締切:</span>
+      <input type="date" class="filter-date" id="filter-date-from" title="開始日">
+      <span class="filter-date-label">〜</span>
+      <input type="date" class="filter-date" id="filter-date-to" title="終了日">
+      <button class="filter-select" style="border:none;background:none;color:var(--accent);cursor:pointer;padding:6px 4px;" onclick="clearDateFilters()">クリア</button>
+    </div>
+
+    <!-- アーカイブ含む -->
+    <div class="archive-toggle-row">
+      <label class="toggle-switch">
+        <input type="checkbox" id="filter-archive">
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="archive-label">期限切れアーカイブも検索する</span>
+    </div>
+
+    <div id="search-results">
+      <div class="empty-state"><div class="empty-text">キーワードを入力して検索してください</div></div>
+    </div>
   </div>
 
 </main>
@@ -635,11 +802,15 @@ function switchTab(tab) {
 function refreshCurrent() {
   loadedTabs.delete(currentTab);
   if (currentTab === 'tasks') undefinedTasks = null;
-  const content = document.getElementById(
+  if (currentTab === 'search') {
+    doSearch();
+    return;
+  }
+  const contentId =
     currentTab === 'home'  ? 'home-content'  :
-    currentTab === 'tasks' ? 'tasks-content' : 'ann-content'
-  );
-  content.innerHTML = '<div class="loader"><div class="spinner"></div>更新中...</div>';
+    currentTab === 'tasks' ? 'tasks-content' : 'ann-content';
+  const content = document.getElementById(contentId);
+  if (content) content.innerHTML = '<div class="loader"><div class="spinner"></div>更新中...</div>';
   loadedTabs.add(currentTab);
   loadTab(currentTab, true);
 }
@@ -648,6 +819,7 @@ function loadTab(tab, forceRefresh) {
   if (tab === 'home')    loadHome(forceRefresh);
   if (tab === 'tasks')   loadTasks(forceRefresh);
   if (tab === 'ann')     loadAnn(forceRefresh);
+  if (tab === 'search')  initSearchTab();
 }
 
 // ========== ホーム ==========
@@ -994,6 +1166,119 @@ function showToast(msg) {
   setTimeout(() => el.classList.remove('show'), 3000);
 }
 
+// ========== 検索タブ ==========
+
+function initSearchTab() {
+  // 教科セレクトボックスを初期化（一度だけ）
+  const sel = document.getElementById('filter-subject');
+  if (sel && sel.options.length <= 1) {
+    const sorted = Object.entries(SUBJECT_MASTER)
+      .filter(([k]) => Number(k) !== 0)
+      .sort((a, b) => Number(a[0]) - Number(b[0]));
+    sorted.forEach(([id, info]) => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = info.name;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+function clearDateFilters() {
+  const f = document.getElementById('filter-date-from');
+  const t = document.getElementById('filter-date-to');
+  if (f) f.value = '';
+  if (t) t.value = '';
+}
+
+function doSearch() {
+  const query = (document.getElementById('search-input').value || '').trim();
+  const type = document.getElementById('filter-type').value;
+  const subjectId = document.getElementById('filter-subject').value;
+  const includeArchive = document.getElementById('filter-archive').checked;
+  const dateFrom = document.getElementById('filter-date-from').value;
+  const dateTo = document.getElementById('filter-date-to').value;
+
+  const resultsEl = document.getElementById('search-results');
+  resultsEl.innerHTML = '<div class="loader"><div class="spinner"></div>検索中...</div>';
+
+  const filters = { type, includeArchive };
+  if (subjectId) filters.subjectId = Number(subjectId);
+  if (dateFrom) filters.deadlineFrom = dateFrom.replace(/-/g, '/');
+  if (dateTo) filters.deadlineTo = dateTo.replace(/-/g, '/');
+
+  callGasB('search', { query, filters: JSON.stringify(filters), lineUserId })
+    .then(data => renderSearchResults(data))
+    .catch(err => {
+      resultsEl.innerHTML = `<div class="error-box">検索エラー: ${escHtml(err.message)}</div>`;
+    });
+}
+
+function renderSearchResults(data) {
+  const resultsEl = document.getElementById('search-results');
+  if (!data || !data.success) {
+    resultsEl.innerHTML = `<div class="error-box">${escHtml(data && data.error ? data.error : '検索失敗')}</div>`;
+    return;
+  }
+
+  const items = data.results || [];
+  if (!items.length) {
+    resultsEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">該当する結果がありません</div></div>';
+    return;
+  }
+
+  let html = `<div class="search-result-count">${items.length}件が見つかりました</div>`;
+  html += '<div class="timeline">';
+
+  items.forEach(item => {
+    const isArchive = !!item.archived;
+    const isTask = item.type === 'task';
+    const sInfo = subjectInfo(item.subject_id);
+    const deadline = item.deadline || '';
+    const deadlineLabel = deadline && deadline !== '未定' ? formatDisplayDate(deadline) : '';
+    const deadlineUrgency = deadline && deadline !== '未定' ? dateUrgency(deadline) : 'none';
+    const isLong = item.description && item.description.length > 80;
+
+    html += `<div class="tl-item ${isTask ? 'task-item' : 'ann-item'}${isArchive ? ' archive-item' : ''}${isLong ? ' expandable' : ''}"${isLong ? ` onclick="expandItem(this)"` : ''}>`;
+    html += `<div class="item-body">
+      <div class="item-title">${escHtml(item.title || '（タイトルなし）')}</div>`;
+
+    if (item.description) {
+      if (isLong) {
+        const short = escHtml(item.description.substring(0, 80)) + '…';
+        const full  = escHtml(item.description);
+        html += `<div class="item-desc item-desc-short">${short}</div>
+                 <div class="item-desc item-desc-full">${full}</div>
+                 <div class="expand-hint">▼ タップして全文表示</div>`;
+      } else {
+        html += `<div class="item-desc">${escHtml(item.description)}</div>`;
+      }
+    }
+
+    html += `<div class="item-meta">
+      <span class="subject-tag" style="background:${sInfo.bg};color:${sInfo.color}">${sInfo.name}</span>`;
+
+    if (!isTask) {
+      html += `<span class="ann-icon">お知らせ</span>`;
+    } else if (deadlineLabel) {
+      html += `<span class="deadline-tag ${deadlineUrgency === 'urgent' ? '' : deadlineUrgency}">${deadlineLabel}まで</span>`;
+    }
+
+    if (isArchive) {
+      html += `<span class="archive-badge">📦 アーカイブ</span>`;
+    }
+
+    if (item.link) {
+      html += `<span class="classroom-link" data-url="${escHtml(item.link)}" onclick="event.stopPropagation(); openExternalUrl(this.dataset.url)">🔗 Classroomで開く</span>`;
+    }
+
+    html += `</div></div></div>`;
+  });
+
+  html += '</div>';
+  resultsEl.innerHTML = html;
+}
+
 // ========== 設定モーダル ==========
 
 function openSettings() {
@@ -1108,7 +1393,7 @@ function getInitialTab() {
         tab = new URLSearchParams(clean).get('tab');
       }
     }
-    if (['home','tasks','ann'].indexOf(tab) >= 0) return tab;
+    if (['home','tasks','ann','search'].indexOf(tab) >= 0) return tab;
   } catch(e) { console.error('getInitialTab error', e); }
   return 'home';
 }
@@ -1117,7 +1402,7 @@ console.log('window.location.search:', window.location.search);
 console.log('INITIAL_TAB:', INITIAL_TAB);
 
 // GAS A 認証済みフラグの検知
-// ?gasAAuthorized=true → bg-sync-setup または register から戻ってきた
+// ?gasAAuthorized=true → register から戻ってきた
 // ?registered=true → Googleアカウント登録完了（初回オンボーディング）
 (function checkGasAAuth() {
   try {
